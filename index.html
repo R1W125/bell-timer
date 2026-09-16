@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twelve-Minute Bell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;500&family=Familjen+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #F3F5F1;
+    --surface: #FFFFFF;
+    --ink: #1B221E;
+    --muted: #5D6862;
+    --line: #D8DED9;
+    --accent: #2E7A5D;
+    --accent-soft: #DCEDE4;
+    --warn: #B9770E;
+    --end: #B14A3C;
+    --enter: #3E5FA8;
+    --track: #E4E8E3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #121613;
+      --surface: #1A201C;
+      --ink: #E6ECE7;
+      --muted: #8B968E;
+      --line: #2C3530;
+      --accent: #5FBE94;
+      --accent-soft: #1F3229;
+      --warn: #DEA65A;
+      --end: #DE7E6C;
+      --enter: #8AA5DE;
+      --track: #242C27;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Familjen Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem 1.25rem 4rem;
+    font-size: 14px;
+  }
+  .app { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 1.75rem; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  header h1 { font-size: 1.15rem; font-weight: 700; margin: 0; letter-spacing: 0.01em; }
+  .sync-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.75rem; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem 0.7rem;
+    background: var(--surface);
+  }
+  .sync-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .sync-chip.live .dot { background: var(--accent); }
+  .sync-chip.warn .dot { background: var(--warn); }
+  .sync-chip.err .dot  { background: var(--end); }
+
+  .clock-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 2rem 2rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+  }
+
+  .cycle-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+  }
+  .cycle-label strong { color: var(--ink); font-weight: 600; letter-spacing: 0.12em; }
+
+  .big-time {
+    font-family: "Chivo Mono", "SFMono-Regular", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 300;
+    font-size: clamp(4rem, 18vw, 7rem);
+    line-height: 1;
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+  .big-time.phase-warn  { color: var(--warn); }
+  .big-time.phase-end   { color: var(--end); }
+  .big-time.phase-enter { color: var(--enter); }
+  .big-time.done        { color: var(--accent); }
+
+  .status-line {
+    text-align: center; min-height: 1.4em;
+    font-size: 0.95rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .status-line.phase-warn  { color: var(--warn); }
+  .status-line.phase-end   { color: var(--end); }
+  .status-line.phase-enter { color: var(--enter); }
+  .status-line.done        { color: var(--accent); }
+
+  .track-wrap { display: flex; flex-direction: column; gap: 0.55rem; }
+  .track {
+    position: relative; height: 10px; border-radius: 5px;
+    background: var(--track);
+    overflow: visible;
+  }
+  .track .fill {
+    position: absolute; inset: 0 auto 0 0; width: 0%;
+    border-radius: 5px; background: var(--accent);
+    transition: width 0.25s linear;
+  }
+  @media (prefers-reduced-motion: reduce) { .track .fill { transition: none; } }
+  .marker {
+    position: absolute; top: -4px; bottom: -4px; width: 2px;
+    border-radius: 1px; background: var(--muted); opacity: 0.85;
+  }
+  .marker.hit-warn  { background: var(--warn); }
+  .marker.hit-end   { background: var(--end); }
+  .marker.hit-enter { background: var(--enter); }
+  .track-legend {
+    position: relative; height: 1.1em;
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+  }
+  .track-legend span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+  .totals {
+    display: flex; justify-content: space-between; gap: 1rem;
+    border-top: 1px solid var(--line); padding-top: 1rem;
+    font-size: 0.85rem; color: var(--muted);
+  }
+  .totals b {
+    color: var(--ink); font-weight: 600;
+    font-family: "Chivo Mono", monospace; font-variant-numeric: tabular-nums; font-size: 0.95rem;
+  }
+
+  .sound-banner {
+    display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+    flex-wrap: wrap;
+    background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px;
+    padding: 0.7rem 1rem; font-size: 0.9rem;
+  }
+  .config-banner {
+    background: var(--surface); border: 1px solid var(--warn); border-radius: 12px;
+    padding: 0.7rem 1rem; font-size: 0.85rem; color: var(--muted); text-align: center;
+  }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: center;
+  }
+  .field {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 0.55rem 0.9rem;
+  }
+  .field label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+  .field input {
+    width: 4.2rem; border: none; background: transparent; color: var(--ink);
+    font-family: "Chivo Mono", monospace; font-size: 1.05rem; text-align: right; outline: none;
+  }
+  .field:focus-within { border-color: var(--accent); }
+
+  button {
+    font-family: inherit; font-size: 0.95rem; font-weight: 600;
+    border-radius: 10px; padding: 0.6rem 1.4rem; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+  @media (prefers-color-scheme: dark) { button.primary { color: #0E1511; } }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 1.1rem 1.4rem;
+  }
+  .panel h2 {
+    margin: 0 0 0.7rem; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--muted); font-weight: 600;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .note { margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--muted); }
+  .note.err { color: var(--end); }
+  .pin-input {
+    width: 6.5rem;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--ground);
+    color: var(--ink); padding: 0.55rem 0.8rem;
+    font-family: "Chivo Mono", monospace; font-size: 1rem; letter-spacing: 0.2em;
+    outline: none;
+  }
+  .pin-input:focus { border-color: var(--accent); }
+  .hosting-badge {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    color: var(--accent); font-weight: 600; font-size: 0.9rem;
+  }
+  .hosting-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+  .bell-row {
+    display: flex; align-items: center; gap: 0.8rem; padding: 0.45rem 0;
+    font-size: 0.9rem;
+  }
+  .bell-row + .bell-row { border-top: 1px solid var(--line); }
+  .bell-row .at {
+    font-family: "Chivo Mono", monospace; font-variant-numeric: tabular-nums;
+    color: var(--muted); width: 3.4rem;
+  }
+  .bell-row .name { flex: 1; font-weight: 500; }
+  .bell-row .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dot-begin { background: var(--accent); }
+  .dot-warn  { background: var(--warn); }
+  .dot-end   { background: var(--end); }
+  .dot-enter { background: var(--enter); }
+  .bell-row button { padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 500; }
+
+  .foot { text-align: center; color: var(--muted); font-size: 0.78rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>Twelve-Minute Bell</h1>
+    <span class="sync-chip" id="syncChip"><span class="dot"></span><span id="syncText">Connecting…</span></span>
+  </header>
+
+  <div class="config-banner" id="configBanner" hidden>
+    This copy of the site has no Firebase config yet, so devices can't sync —
+    it runs as a single-device timer. (Site owner: paste the <code>firebaseConfig</code> block into index.html.)
+  </div>
+
+  <div class="clock-card">
+    <div class="cycle-label">
+      <span>Cycle countdown</span>
+      <strong id="cycleCount">cycle — of —</strong>
+    </div>
+    <div class="big-time" id="bigTime">12:00</div>
+    <div class="status-line" id="statusLine">Waiting for the host to start</div>
+
+    <div class="track-wrap">
+      <div class="track">
+        <div class="fill" id="trackFill"></div>
+        <div class="marker" id="mWarn"  style="left: 66.667%;"></div>
+        <div class="marker" id="mEnd"   style="left: 83.333%;"></div>
+        <div class="marker" id="mEnter" style="left: 91.667%;"></div>
+      </div>
+      <div class="track-legend">
+        <span style="left: 0; transform: none;">0:00</span>
+        <span style="left: 66.667%;">2-min</span>
+        <span style="left: 83.333%;">end</span>
+        <span style="left: auto; right: 0; transform: none;">enter</span>
+      </div>
+    </div>
+
+    <div class="totals">
+      <span>Elapsed <b id="totalElapsed">0:00:00</b></span>
+      <span>Remaining <b id="totalRemaining">–:––:––</b></span>
+    </div>
+  </div>
+
+  <div class="sound-banner" id="soundBanner">
+    <span>Bells are silent on this device until you enable sound.</span>
+    <button class="primary" id="soundBtn">Enable sound</button>
+  </div>
+
+  <div class="controls" id="controls" hidden>
+    <div class="field">
+      <label for="hoursInput">Run for</label>
+      <input id="hoursInput" type="number" min="0.1" step="0.1" value="1" inputmode="decimal">
+      <label for="hoursInput">hours</label>
+    </div>
+    <button class="primary" id="startBtn">Start</button>
+    <button id="resetBtn" disabled>Reset</button>
+  </div>
+
+  <div class="panel">
+    <h2>Host</h2>
+    <div id="hostLocked">
+      <div class="row">
+        <input class="pin-input" id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN">
+        <button id="unlockBtn">Unlock controls</button>
+      </div>
+      <p class="note" id="pinNote">This device is view-only: it follows the host live and rings every bell. Enter the host PIN to control the timer from here.</p>
+    </div>
+    <div id="hostOpen" hidden>
+      <div class="row">
+        <span class="hosting-badge">Controls unlocked on this device</span>
+        <button id="lockBtn">Lock again</button>
+      </div>
+      <p class="note">Start, pause, and reset from here reach every open device within about a second. More than one device can be unlocked at a time; the latest action wins.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Bells each cycle — on every device</h2>
+    <div class="bell-row">
+      <span class="dot dot-begin"></span><span class="at">0:00</span>
+      <span class="name">Cycle start — one short beep</span>
+      <button data-test="begin">Preview</button>
+    </div>
+    <div class="bell-row">
+      <span class="dot dot-warn"></span><span class="at">8:00</span>
+      <span class="name">2-minute warning — two soft beeps</span>
+      <button data-test="warn2">Preview</button>
+    </div>
+    <div class="bell-row">
+      <span class="dot dot-end"></span><span class="at">10:00</span>
+      <span class="name">End — three steady tones</span>
+      <button data-test="end">Preview</button>
+    </div>
+    <div class="bell-row">
+      <span class="dot dot-enter"></span><span class="at">11:00</span>
+      <span class="name">Enter — two-note chime</span>
+      <button data-test="enter">Preview</button>
+    </div>
+  </div>
+
+  <p class="foot">Every device computes the countdown from the shared start time (corrected against the server clock) and rings its own bells locally, so alarms stay simultaneous even on a slow connection. Enable sound once per device and keep screens on and unmuted.</p>
+</div>
+
+<script type="module">
+"use strict";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDk1vlkujq7iK8G9Kld2cZcL3Sb7T8gbYE",
+  authDomain: "timer-98bf7.firebaseapp.com",
+  databaseURL: "https://timer-98bf7-default-rtdb.firebaseio.com",
+  projectId: "timer-98bf7",
+  storageBucket: "timer-98bf7.firebasestorage.app",
+  messagingSenderId: "413569001005",
+  appId: "1:413569001005:web:14be22966d6c668650baa4",
+  measurementId: "G-JKEJ25DDN4"
+};
+
+const CYCLE = 12 * 60; // seconds
+const BELLS = [
+  { at: 8 * 60,  id: "warn2", label: "2-minute warning", cls: "phase-warn"  },
+  { at: 10 * 60, id: "end",   label: "End",              cls: "phase-end"   },
+  { at: 11 * 60, id: "enter", label: "Enter",            cls: "phase-enter" }
+];
+const PIN_HASH = "dd49477b0b970dde26d58606384cfedd0dc5740b719bffc06442e7d949849deb";
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  big: $("bigTime"), status: $("statusLine"), fill: $("trackFill"),
+  cycleCount: $("cycleCount"), elapsed: $("totalElapsed"), remaining: $("totalRemaining"),
+  hours: $("hoursInput"), start: $("startBtn"), reset: $("resetBtn"), controls: $("controls"),
+  syncChip: $("syncChip"), syncText: $("syncText"), configBanner: $("configBanner"),
+  soundBanner: $("soundBanner"), soundBtn: $("soundBtn"),
+  hostLocked: $("hostLocked"), hostOpen: $("hostOpen"),
+  pinInput: $("pinInput"), unlockBtn: $("unlockBtn"), pinNote: $("pinNote"), lockBtn: $("lockBtn"),
+  markers: { warn2: $("mWarn"), end: $("mEnd"), enter: $("mEnter") }
+};
+
+// Shared timer state, mirrored from Firebase (or local-only in solo mode).
+// phase: "idle" | "running" | "paused"
+let S = { phase: "idle", totalSec: 0, baseElapsed: 0, startEpoch: null };
+let mode = "connecting"; // "connecting" | "synced" | "solo"
+let unlocked = false;
+let audioReady = false;
+let serverOffset = 0;    // ms to add to Date.now() to approximate server time
+let timerRef = null;
+let fbSet = null;
+let lastRunKey = "";
+let wakeLock = null;
+
+/* ---------- shared clock ---------- */
+
+const sharedNow = () => Date.now() + serverOffset;
+
+/* ---------- audio ---------- */
+
+let ctx = null;
+let scheduled = [];
+
+function audio() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+
+function beep(t0, freq, dur, gain) {
+  const ac = audio();
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.035);
+  g.gain.setValueAtTime(gain, t0 + dur - 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g).connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+  scheduled.push(osc);
+  osc.onended = () => {
+    const i = scheduled.indexOf(osc);
+    if (i !== -1) scheduled.splice(i, 1);
+  };
+}
+
+const PATTERNS = {
+  begin: (t0) => { // cycle start: one short beep
+    beep(t0, 523, 0.2, 0.24);
+  },
+  warn2: (t0) => { // two soft mid beeps
+    beep(t0, 784, 0.16, 0.26);
+    beep(t0 + 0.3, 784, 0.16, 0.26);
+  },
+  end: (t0) => { // three even, steady tones
+    beep(t0, 523, 0.24, 0.28);
+    beep(t0 + 0.36, 523, 0.24, 0.28);
+    beep(t0 + 0.72, 523, 0.24, 0.28);
+  },
+  enter: (t0) => { // gentle two-note step up
+    beep(t0, 587, 0.2, 0.28);
+    beep(t0 + 0.3, 659, 0.3, 0.28);
+  },
+  finish: (t0) => { // closing chime: one note, echoed softer
+    beep(t0, 659, 0.4, 0.3);
+    beep(t0 + 0.55, 659, 0.6, 0.2);
+  }
+};
+
+function cancelBells() {
+  scheduled.slice().forEach((o) => { try { o.stop(0); } catch (e) {} try { o.disconnect(); } catch (e) {} });
+  scheduled = [];
+}
+
+// Every bell in the run as an offset in seconds from elapsed zero.
+function bellOffsets() {
+  const out = [];
+  if (!S.totalSec) return out;
+  const cycles = Math.ceil(S.totalSec / CYCLE);
+  for (let c = 0; c < cycles; c++) {
+    if (c * CYCLE < S.totalSec) out.push({ at: c * CYCLE, id: "begin" });
+    for (const b of BELLS) {
+      const abs = c * CYCLE + b.at;
+      if (abs < S.totalSec) out.push({ at: abs, id: b.id });
+    }
+  }
+  out.push({ at: S.totalSec, id: "finish" });
+  return out;
+}
+
+function elapsedNow() {
+  let e = S.baseElapsed;
+  if (S.phase === "running" && S.startEpoch) e += (sharedNow() - S.startEpoch) / 1000;
+  return Math.min(e, S.totalSec || e);
+}
+
+// Anchor every future bell to the shared clock via the audio clock.
+function scheduleBells() {
+  cancelBells();
+  if (!audioReady || S.phase !== "running" || !S.totalSec) return;
+  const acNow = audio().currentTime;
+  const from = elapsedNow();
+  for (const bell of bellOffsets()) {
+    if (bell.at - from > 0.25) PATTERNS[bell.id](acNow + (bell.at - from));
+  }
+}
+
+// The audio clock can drift from the wall clock over hours, so re-anchor
+// periodically — but never within a few seconds of a bell, to avoid
+// cutting one off mid-ring.
+setInterval(() => {
+  if (!audioReady || S.phase !== "running") return;
+  const e = elapsedNow();
+  let nearest = Infinity;
+  for (const bell of bellOffsets()) nearest = Math.min(nearest, Math.abs(bell.at - e));
+  if (nearest > 4) scheduleBells();
+}, 45000);
+
+/* ---------- keep the screen awake while running ---------- */
+
+function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    navigator.wakeLock.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
+  } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && S.phase === "running") requestWakeLock();
+});
+
+/* ---------- shared state ---------- */
+
+const runKey = () => [S.phase, S.totalSec, S.baseElapsed, S.startEpoch].join("|");
+
+function applyRemote(data) {
+  if (data && typeof data === "object") {
+    S = {
+      phase: typeof data.phase === "string" ? data.phase : "idle",
+      totalSec: typeof data.totalSec === "number" ? data.totalSec : 0,
+      baseElapsed: typeof data.baseElapsed === "number" ? data.baseElapsed : 0,
+      startEpoch: typeof data.startEpoch === "number" ? data.startEpoch : null
+    };
+  } else {
+    S = { phase: "idle", totalSec: 0, baseElapsed: 0, startEpoch: null };
+  }
+  const key = runKey();
+  if (key !== lastRunKey) {
+    lastRunKey = key;
+    scheduleBells();
+    if (S.phase === "running") requestWakeLock();
+  }
+  render();
+}
+
+function pushState() {
+  lastRunKey = runKey();
+  scheduleBells();
+  if (S.phase === "running") requestWakeLock();
+  render();
+  if (mode === "synced" && timerRef && fbSet) {
+    fbSet(timerRef, {
+      phase: S.phase, totalSec: S.totalSec, baseElapsed: S.baseElapsed,
+      startEpoch: S.startEpoch, updatedAt: sharedNow()
+    }).catch(() => setChip("warn", "Write failed — check connection"));
+  }
+}
+
+function setChip(cls, text) {
+  els.syncChip.className = "sync-chip " + cls;
+  els.syncText.textContent = text;
+}
+
+function enterSolo(reason) {
+  mode = "solo";
+  setChip("warn", reason || "Solo device — no sync");
+  render();
+}
+
+async function initFirebase() {
+  if (!firebaseConfig.apiKey || !firebaseConfig.databaseURL) {
+    els.configBanner.hidden = false;
+    enterSolo("Not configured — solo device");
+    return;
+  }
+  try {
+    const appMod = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js");
+    const dbMod = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js");
+    const app = appMod.initializeApp(firebaseConfig);
+    const db = dbMod.getDatabase(app);
+    fbSet = dbMod.set;
+    timerRef = dbMod.ref(db, "timer");
+
+    dbMod.onValue(dbMod.ref(db, ".info/serverTimeOffset"), (snap) => {
+      const v = snap.val();
+      if (typeof v === "number") serverOffset = v;
+    });
+    dbMod.onValue(dbMod.ref(db, ".info/connected"), (snap) => {
+      if (mode !== "synced") return;
+      setChip(snap.val() ? "live" : "warn", snap.val() ? "Live sync" : "Reconnecting…");
+    });
+    mode = "synced";
+    setChip("live", "Live sync");
+    dbMod.onValue(timerRef, (snap) => applyRemote(snap.val()),
+      () => { setChip("err", "Sync error — check database rules"); });
+  } catch (e) {
+    enterSolo("Couldn't reach Firebase — solo device");
+  }
+}
+
+/* ---------- host PIN ---------- */
+
+async function sha256(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+function refreshHost() {
+  els.hostLocked.hidden = unlocked;
+  els.hostOpen.hidden = !unlocked;
+  els.controls.hidden = !unlocked;
+}
+
+els.unlockBtn.addEventListener("click", async () => {
+  const pin = els.pinInput.value.trim();
+  if (!pin) { els.pinInput.focus(); return; }
+  if ((await sha256(pin)) === PIN_HASH) {
+    unlocked = true;
+    try { localStorage.setItem("tmb_host_ok", "1"); } catch (e) {}
+    els.pinInput.value = "";
+    els.pinNote.className = "note";
+    refreshHost();
+    render();
+  } else {
+    els.pinNote.className = "note err";
+    els.pinNote.textContent = "That PIN doesn't match.";
+  }
+});
+els.pinInput.addEventListener("keydown", (e) => { if (e.key === "Enter") els.unlockBtn.click(); });
+
+els.lockBtn.addEventListener("click", () => {
+  unlocked = false;
+  try { localStorage.removeItem("tmb_host_ok"); } catch (e) {}
+  refreshHost();
+});
+
+try { if (localStorage.getItem("tmb_host_ok") === "1") unlocked = true; } catch (e) {}
+
+/* ---------- controls ---------- */
+
+els.start.addEventListener("click", () => {
+  if (!unlocked) return;
+  audioReady = true;
+  els.soundBanner.hidden = true;
+  audio();
+  if (S.phase === "running") {
+    S.baseElapsed = elapsedNow();
+    S.startEpoch = null;
+    S.phase = "paused";
+  } else if (S.phase === "paused") {
+    S.startEpoch = sharedNow();
+    S.phase = "running";
+  } else {
+    const hrs = parseFloat(els.hours.value);
+    if (!(hrs > 0)) { els.status.textContent = "Enter a number of hours above 0"; return; }
+    S.totalSec = Math.round(hrs * 3600);
+    S.baseElapsed = 0;
+    S.startEpoch = sharedNow();
+    S.phase = "running";
+  }
+  pushState();
+});
+
+els.reset.addEventListener("click", () => {
+  if (!unlocked) return;
+  const active = S.phase === "running" || S.phase === "paused";
+  const finished = active && S.totalSec > 0 && elapsedNow() >= S.totalSec;
+  if (active && !finished && !confirm("Reset the timer on every device?")) return;
+  S = { phase: "idle", totalSec: 0, baseElapsed: 0, startEpoch: null };
+  pushState();
+});
+
+/* ---------- sound ---------- */
+
+els.soundBtn.addEventListener("click", () => {
+  audio();
+  audioReady = true;
+  els.soundBanner.hidden = true;
+  scheduleBells();
+  if (S.phase === "running") requestWakeLock();
+});
+
+document.querySelectorAll("[data-test]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const firstUnlock = !audioReady;
+    audioReady = true;
+    els.soundBanner.hidden = true;
+    if (firstUnlock) scheduleBells();
+    // Play the preview untracked so later state changes can't cut it off
+    // and it can't wipe the queued bells.
+    const saved = scheduled;
+    scheduled = [];
+    PATTERNS[btn.getAttribute("data-test")](audio().currentTime + 0.05);
+    scheduled = saved;
+  });
+});
+
+/* ---------- rendering ---------- */
+
+const pad = (n) => (n < 10 ? "0" : "") + n;
+function fmtMS(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  return Math.floor(sec / 60) + ":" + pad(sec % 60);
+}
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return Math.floor(sec / 3600) + ":" + pad(Math.floor((sec % 3600) / 60)) + ":" + pad(sec % 60);
+}
+function setPhaseClass(el, cls) {
+  el.classList.remove("phase-warn", "phase-end", "phase-enter", "done");
+  if (cls) el.classList.add(cls);
+}
+function clearMarkers() {
+  for (const k of Object.keys(els.markers)) els.markers[k].className = "marker";
+}
+
+function render() {
+  const active = S.phase === "running" || S.phase === "paused";
+  const e = active ? elapsedNow() : 0;
+  const cyclesTotal = S.totalSec > 0 ? Math.ceil(S.totalSec / CYCLE) : 0;
+  const isDone = active && S.totalSec > 0 && e >= S.totalSec;
+
+  if (isDone) {
+    els.big.textContent = "0:00";
+    setPhaseClass(els.big, "done");
+    setPhaseClass(els.status, "done");
+    els.status.textContent = "Done — " + fmtHMS(S.totalSec) + " complete";
+    els.fill.style.width = "100%";
+    els.cycleCount.textContent = "cycle " + cyclesTotal + " of " + cyclesTotal;
+    els.elapsed.textContent = fmtHMS(S.totalSec);
+    els.remaining.textContent = fmtHMS(0);
+    clearMarkers();
+    els.start.disabled = true;
+    els.reset.disabled = false;
+    els.hours.disabled = true;
+    return;
+  }
+
+  const inCycle = active ? e % CYCLE : 0;
+  els.big.textContent = fmtMS(CYCLE - inCycle);
+  els.fill.style.width = (inCycle / CYCLE * 100).toFixed(2) + "%";
+  els.cycleCount.textContent = active ? "cycle " + (Math.floor(e / CYCLE) + 1) + " of " + cyclesTotal : "cycle — of —";
+  els.elapsed.textContent = fmtHMS(active ? e : 0);
+  els.remaining.textContent = active ? fmtHMS(S.totalSec - e) : "–:––:––";
+
+  let current = null;
+  for (const b of BELLS) {
+    const hit = active && S.phase === "running" && inCycle >= b.at;
+    els.markers[b.id].className = "marker" + (hit ? " hit-" + (b.id === "warn2" ? "warn" : b.id) : "");
+    if (hit) current = b;
+  }
+  setPhaseClass(els.big, S.phase === "running" ? (current && current.cls) : null);
+  setPhaseClass(els.status, S.phase === "running" ? (current && current.cls) : null);
+  if (S.phase === "running") els.status.textContent = current ? current.label : "Running";
+  else if (S.phase === "paused") els.status.textContent = "Paused";
+  else els.status.textContent = unlocked ? "Set hours, then start" : "Waiting for the host to start";
+
+  els.start.textContent = S.phase === "running" ? "Pause" : (S.phase === "paused" ? "Resume" : "Start");
+  els.start.disabled = false;
+  els.reset.disabled = S.phase === "idle";
+  els.hours.disabled = S.phase !== "idle";
+}
+
+/* ---------- init ---------- */
+
+setChip("", "Connecting…");
+refreshHost();
+render();
+setInterval(render, 200);
+initFirebase();
+</script>
+</body>
+</html>
