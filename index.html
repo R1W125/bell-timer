@@ -50,6 +50,10 @@
   }
   .app { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 1.75rem; }
 
+  .banner {
+    display: block; width: 100%; height: auto;
+    border-radius: 14px; border: 1px solid var(--line);
+  }
   header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   header h1 { font-size: 1.15rem; font-weight: 700; margin: 0; letter-spacing: 0.01em; }
   .sync-chip {
@@ -223,6 +227,8 @@
 <body>
 
 <div class="app">
+  <img class="banner" src="banner.jpg"
+       alt="CDS Talent Sprint 2026 — BU Faculty of Computing &amp; Data Sciences. Rapid networking and personalized speed interviews, September 24.">
   <header>
     <h1>Twelve-Minute Bell</h1>
     <span class="sync-chip" id="syncChip"><span class="dot"></span><span id="syncText">Connecting…</span></span>
@@ -299,17 +305,17 @@
     <h2>Bells each cycle — on every device</h2>
     <div class="bell-row">
       <span class="dot dot-begin"></span><span class="at">0:00</span>
-      <span class="name">Cycle start — one short beep</span>
+      <span class="name">Round start — announcement</span>
       <button data-test="begin">Preview</button>
     </div>
     <div class="bell-row">
       <span class="dot dot-warn"></span><span class="at">8:00</span>
-      <span class="name">2-minute warning — two soft beeps</span>
+      <span class="name">2-minute warning — announcement</span>
       <button data-test="warn2">Preview</button>
     </div>
     <div class="bell-row">
       <span class="dot dot-end"></span><span class="at">10:00</span>
-      <span class="name">End — three steady tones</span>
+      <span class="name">Time's up — announcement</span>
       <button data-test="end">Preview</button>
     </div>
     <div class="bell-row">
@@ -339,7 +345,7 @@ const firebaseConfig = {
 const CYCLE = 12 * 60; // seconds
 const BELLS = [
   { at: 8 * 60,  id: "warn2", label: "2-minute warning", cls: "phase-warn"  },
-  { at: 10 * 60, id: "end",   label: "End",              cls: "phase-end"   },
+  { at: 10 * 60, id: "end",   label: "Time's up",        cls: "phase-end"   },
   { at: 11 * 60, id: "enter", label: "Enter",            cls: "phase-enter" }
 ];
 const PIN_HASH = "dd49477b0b970dde26d58606384cfedd0dc5740b719bffc06442e7d949849deb";
@@ -403,15 +409,16 @@ function beep(t0, freq, dur, gain) {
   };
 }
 
-const PATTERNS = {
-  begin: (t0) => { // cycle start: one short beep
+// Synth fallbacks, used only if a recording fails to load.
+const SYNTH = {
+  begin: (t0) => {
     beep(t0, 523, 0.2, 0.24);
   },
-  warn2: (t0) => { // two soft mid beeps
+  warn2: (t0) => {
     beep(t0, 784, 0.16, 0.26);
     beep(t0 + 0.3, 784, 0.16, 0.26);
   },
-  end: (t0) => { // three even, steady tones
+  end: (t0) => {
     beep(t0, 523, 0.24, 0.28);
     beep(t0 + 0.36, 523, 0.24, 0.28);
     beep(t0 + 0.72, 523, 0.24, 0.28);
@@ -425,6 +432,55 @@ const PATTERNS = {
     beep(t0 + 0.55, 659, 0.6, 0.2);
   }
 };
+
+// Recorded announcements for the main bells; enter/finish stay synthesized.
+const SOUND_FILES = { begin: "audio/start.mp3", warn2: "audio/warn2.mp3", end: "audio/end.mp3" };
+const rawAudio = {};  // name -> fetched ArrayBuffer
+const buffers = {};   // name -> decoded AudioBuffer
+const decoding = {};
+
+for (const [name, url] of Object.entries(SOUND_FILES)) {
+  fetch(url)
+    .then((r) => (r.ok ? r.arrayBuffer() : null))
+    .then((buf) => {
+      if (!buf) return;
+      rawAudio[name] = buf;
+      // If sound is already on, upgrade queued synth bells to the recording
+      // — but not within a few seconds of a bell.
+      if (audioReady) ensureBuffers().then(safeReschedule);
+    })
+    .catch(() => {});
+}
+
+function ensureBuffers() {
+  const ac = audio();
+  return Promise.all(Object.keys(SOUND_FILES).map((name) => {
+    if (buffers[name] || !rawAudio[name]) return null;
+    if (!decoding[name]) {
+      decoding[name] = ac.decodeAudioData(rawAudio[name].slice(0))
+        .then((b) => { buffers[name] = b; })
+        .catch(() => { delete decoding[name]; });
+    }
+    return decoding[name];
+  }));
+}
+
+function playBell(id, t0) {
+  const buf = buffers[id];
+  if (!buf) { SYNTH[id](t0); return; }
+  const ac = audio();
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const g = ac.createGain();
+  g.gain.value = 0.9;
+  src.connect(g).connect(ac.destination);
+  src.start(t0);
+  scheduled.push(src);
+  src.onended = () => {
+    const i = scheduled.indexOf(src);
+    if (i !== -1) scheduled.splice(i, 1);
+  };
+}
 
 function cancelBells() {
   scheduled.slice().forEach((o) => { try { o.stop(0); } catch (e) {} try { o.disconnect(); } catch (e) {} });
@@ -460,20 +516,23 @@ function scheduleBells() {
   const acNow = audio().currentTime;
   const from = elapsedNow();
   for (const bell of bellOffsets()) {
-    if (bell.at - from > 0.25) PATTERNS[bell.id](acNow + (bell.at - from));
+    if (bell.at - from > 0.25) playBell(bell.id, acNow + (bell.at - from));
   }
 }
 
-// The audio clock can drift from the wall clock over hours, so re-anchor
-// periodically — but never within a few seconds of a bell, to avoid
-// cutting one off mid-ring.
-setInterval(() => {
+// Reschedule only when no bell is within a few seconds, to avoid cutting
+// one off mid-ring.
+function safeReschedule() {
   if (!audioReady || S.phase !== "running") return;
   const e = elapsedNow();
   let nearest = Infinity;
   for (const bell of bellOffsets()) nearest = Math.min(nearest, Math.abs(bell.at - e));
   if (nearest > 4) scheduleBells();
-}, 45000);
+}
+
+// The audio clock can drift from the wall clock over hours, so re-anchor
+// periodically.
+setInterval(safeReschedule, 45000);
 
 /* ---------- keep the screen awake while running ---------- */
 
@@ -606,11 +665,12 @@ try { if (localStorage.getItem("tmb_host_ok") === "1") unlocked = true; } catch 
 
 /* ---------- controls ---------- */
 
-els.start.addEventListener("click", () => {
+els.start.addEventListener("click", async () => {
   if (!unlocked) return;
   audioReady = true;
   els.soundBanner.hidden = true;
   audio();
+  await ensureBuffers();
   if (S.phase === "running") {
     S.baseElapsed = elapsedNow();
     S.startEpoch = null;
@@ -640,8 +700,9 @@ els.reset.addEventListener("click", () => {
 
 /* ---------- sound ---------- */
 
-els.soundBtn.addEventListener("click", () => {
+els.soundBtn.addEventListener("click", async () => {
   audio();
+  await ensureBuffers();
   audioReady = true;
   els.soundBanner.hidden = true;
   scheduleBells();
@@ -649,8 +710,10 @@ els.soundBtn.addEventListener("click", () => {
 });
 
 document.querySelectorAll("[data-test]").forEach((btn) => {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", async () => {
     const firstUnlock = !audioReady;
+    audio();
+    await ensureBuffers();
     audioReady = true;
     els.soundBanner.hidden = true;
     if (firstUnlock) scheduleBells();
@@ -658,7 +721,7 @@ document.querySelectorAll("[data-test]").forEach((btn) => {
     // and it can't wipe the queued bells.
     const saved = scheduled;
     scheduled = [];
-    PATTERNS[btn.getAttribute("data-test")](audio().currentTime + 0.05);
+    playBell(btn.getAttribute("data-test"), audio().currentTime + 0.05);
     scheduled = saved;
   });
 });
