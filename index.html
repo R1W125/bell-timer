@@ -52,8 +52,9 @@
   }
 
   /* Full-screen banner with the timer overlaid bottom-left */
-  .hero { position: relative; width: 100%; height: 100svh; }
-  .hero img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .hero { position: relative; width: 100%; height: 100svh; overflow: hidden; }
+  /* The image is nudged left so its text sits clear of the timer card */
+  .hero img { display: block; width: 108%; margin-left: -8%; height: 100%; object-fit: cover; }
   .timer-card {
     /* Fixed bright-on-glass palette: the card always sits on the dark image */
     --surface: transparent;
@@ -73,13 +74,13 @@
     backdrop-filter: blur(12px);
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 1.7rem 1.4rem 1.6rem;
-    display: flex; flex-direction: column; gap: 1.15rem;
+    padding: 2.1rem 1.4rem 2rem;
+    display: flex; flex-direction: column; gap: 1.4rem;
   }
   /* On small screens the image becomes a banner with the timer below it */
   @media (max-width: 700px) {
     .hero { height: auto; }
-    .hero img { height: auto; }
+    .hero img { height: auto; width: 100%; margin-left: 0; }
     .timer-card {
       position: static; width: auto;
       margin: 0.75rem;
@@ -122,7 +123,6 @@
   }
   .big-time.phase-warn  { color: var(--warn); }
   .big-time.phase-end   { color: var(--end); }
-  .big-time.phase-enter { color: var(--enter); }
   .big-time.done        { color: var(--accent); }
 
   .status-line {
@@ -132,7 +132,6 @@
   }
   .status-line.phase-warn  { color: var(--warn); }
   .status-line.phase-end   { color: var(--end); }
-  .status-line.phase-enter { color: var(--enter); }
   .status-line.done        { color: var(--accent); }
 
   .track-wrap { display: flex; flex-direction: column; gap: 0.55rem; }
@@ -153,7 +152,6 @@
   }
   .marker.hit-warn  { background: var(--warn); }
   .marker.hit-end   { background: var(--end); }
-  .marker.hit-enter { background: var(--enter); }
   .track-legend {
     position: relative; height: 1.1em;
     font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
@@ -245,7 +243,6 @@
   .dot-begin { background: var(--accent); }
   .dot-warn  { background: var(--warn); }
   .dot-end   { background: var(--end); }
-  .dot-enter { background: var(--enter); }
   .bell-row button { padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 500; }
 
   .foot { text-align: center; color: var(--muted); font-size: 0.78rem; }
@@ -270,13 +267,11 @@
         <div class="fill" id="trackFill"></div>
         <div class="marker" id="mWarn"  style="left: 66.667%;"></div>
         <div class="marker" id="mEnd"   style="left: 83.333%;"></div>
-        <div class="marker" id="mEnter" style="left: 91.667%;"></div>
       </div>
       <div class="track-legend">
         <span style="left: 0; transform: none;">0:00</span>
         <span style="left: 66.667%;">2-min</span>
-        <span style="left: 83.333%;">end</span>
-        <span style="left: auto; right: 0; transform: none;">enter</span>
+        <span style="left: 83.333%;">time's up</span>
       </div>
     </div>
 
@@ -290,7 +285,7 @@
 <div class="app">
   <header>
     <h1>Twelve-Minute Bell</h1>
-    <span class="sub">bells at 0:00 · 8:00 · 10:00 · 11:00, every cycle</span>
+    <span class="sub">bells at 0:00 · 8:00 · 10:00, every cycle</span>
   </header>
 
   <div class="config-banner" id="configBanner" hidden>
@@ -348,11 +343,6 @@
       <span class="name">Time's up — announcement</span>
       <button data-test="end">Preview</button>
     </div>
-    <div class="bell-row">
-      <span class="dot dot-enter"></span><span class="at">11:00</span>
-      <span class="name">Enter — two-note chime</span>
-      <button data-test="enter">Preview</button>
-    </div>
   </div>
 
   <p class="foot">Every device computes the countdown from the shared start time (corrected against the server clock) and rings its own bells locally, so alarms stay simultaneous even on a slow connection. Enable sound once per device and keep screens on and unmuted.</p>
@@ -375,8 +365,7 @@ const firebaseConfig = {
 const CYCLE = 12 * 60; // seconds
 const BELLS = [
   { at: 8 * 60,  id: "warn2", label: "2-minute warning", cls: "phase-warn"  },
-  { at: 10 * 60, id: "end",   label: "Time's up",        cls: "phase-end"   },
-  { at: 11 * 60, id: "enter", label: "Enter",            cls: "phase-enter" }
+  { at: 10 * 60, id: "end",   label: "Time's up",        cls: "phase-end"   }
 ];
 const PIN_HASH = "dd49477b0b970dde26d58606384cfedd0dc5740b719bffc06442e7d949849deb";
 
@@ -389,7 +378,7 @@ const els = {
   soundBanner: $("soundBanner"), soundBtn: $("soundBtn"),
   hostLocked: $("hostLocked"), hostOpen: $("hostOpen"),
   pinInput: $("pinInput"), unlockBtn: $("unlockBtn"), pinNote: $("pinNote"), lockBtn: $("lockBtn"),
-  markers: { warn2: $("mWarn"), end: $("mEnd"), enter: $("mEnter") }
+  markers: { warn2: $("mWarn"), end: $("mEnd") }
 };
 
 // Shared timer state, mirrored from Firebase (or local-only in solo mode).
@@ -452,10 +441,6 @@ const SYNTH = {
     beep(t0, 523, 0.24, 0.28);
     beep(t0 + 0.36, 523, 0.24, 0.28);
     beep(t0 + 0.72, 523, 0.24, 0.28);
-  },
-  enter: (t0) => { // gentle two-note step up
-    beep(t0, 587, 0.2, 0.28);
-    beep(t0 + 0.3, 659, 0.3, 0.28);
   },
   finish: (t0) => { // closing chime: one note, echoed softer
     beep(t0, 659, 0.4, 0.3);
