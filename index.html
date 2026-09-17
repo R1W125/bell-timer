@@ -53,8 +53,9 @@
 
   /* Full-screen banner with the timer overlaid bottom-left */
   .hero { position: relative; width: 100%; height: 100svh; overflow: hidden; }
-  /* The image is nudged left so its text sits clear of the timer card */
-  .hero img { display: block; width: 108%; margin-left: -8%; height: 100%; object-fit: cover; }
+  /* Cover-crop anchored to the image's right edge: any cropping comes off
+     the empty space left of the title, with no extra zoom */
+  .hero img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
   .timer-card {
     /* Fixed bright-on-glass palette: the card always sits on the dark image */
     --surface: transparent;
@@ -80,7 +81,7 @@
   /* On small screens the image becomes a banner with the timer below it */
   @media (max-width: 700px) {
     .hero { height: auto; }
-    .hero img { height: auto; width: 100%; margin-left: 0; }
+    .hero img { height: auto; }
     .timer-card {
       position: static; width: auto;
       margin: 0.75rem;
