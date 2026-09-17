@@ -8,31 +8,31 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;500&family=Familjen+Grotesk:wght@400;500;600;700&display=swap">
 <style>
   :root {
-    --ground: #F3F5F1;
+    --ground: #F6F2F1;
     --surface: #FFFFFF;
-    --ink: #1B221E;
-    --muted: #5D6862;
-    --line: #D8DED9;
-    --accent: #2E7A5D;
-    --accent-soft: #DCEDE4;
+    --ink: #241B1A;
+    --muted: #6A5D5B;
+    --line: #E0D7D5;
+    --accent: #C31F1F;
+    --accent-soft: #F7DCD8;
     --warn: #B9770E;
-    --end: #B14A3C;
+    --end: #8F2B1D;
     --enter: #3E5FA8;
-    --track: #E4E8E3;
+    --track: #EAE2E0;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #121613;
-      --surface: #1A201C;
-      --ink: #E6ECE7;
-      --muted: #8B968E;
-      --line: #2C3530;
-      --accent: #5FBE94;
-      --accent-soft: #1F3229;
+      --ground: #171211;
+      --surface: #211A19;
+      --ink: #EDE6E4;
+      --muted: #998B88;
+      --line: #372C2A;
+      --accent: #E56A5E;
+      --accent-soft: #3B201C;
       --warn: #DEA65A;
-      --end: #DE7E6C;
+      --end: #E89180;
       --enter: #8AA5DE;
-      --track: #242C27;
+      --track: #2D2422;
     }
   }
 
@@ -43,19 +43,46 @@
     color: var(--ink);
     font-family: "Familjen Grotesk", "Avenir Next", "Segoe UI", sans-serif;
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    padding: 2.5rem 1.25rem 4rem;
     font-size: 14px;
   }
-  .app { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 1.75rem; }
-
-  .banner {
-    display: block; width: 100%; height: auto;
-    border-radius: 14px; border: 1px solid var(--line);
+  .app {
+    max-width: 640px; margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+    display: flex; flex-direction: column; gap: 1.75rem;
   }
+
+  /* Full-screen banner with the timer overlaid bottom-left */
+  .hero { position: relative; width: 100%; height: 100svh; }
+  .hero img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .timer-card {
+    /* Fixed bright-on-glass palette: the card always sits on the dark image */
+    --surface: transparent;
+    --ink: #F3EFEC;
+    --muted: #C6BCB7;
+    --line: rgba(255, 255, 255, 0.25);
+    --track: rgba(255, 255, 255, 0.2);
+    --accent: #E8695D;
+    --warn: #E5B066;
+    --end: #F0907E;
+    --enter: #9FB6E8;
+    position: absolute; left: 1.25rem; bottom: 1.25rem;
+    width: min(46%, 540px);
+    color: var(--ink);
+    background: rgba(22, 13, 12, 0.68);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.2rem 1.4rem 1.1rem;
+    display: flex; flex-direction: column; gap: 0.9rem;
+  }
+  @media (max-width: 700px) {
+    .timer-card { width: auto; left: 0.75rem; right: 0.75rem; bottom: 0.75rem; }
+  }
+
   header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   header h1 { font-size: 1.15rem; font-weight: 700; margin: 0; letter-spacing: 0.01em; }
+  header .sub { color: var(--muted); font-size: 0.85rem; }
   .sync-chip {
     display: inline-flex; align-items: center; gap: 0.4rem;
     font-size: 0.75rem; color: var(--muted);
@@ -67,16 +94,6 @@
   .sync-chip.warn .dot { background: var(--warn); }
   .sync-chip.err .dot  { background: var(--end); }
 
-  .clock-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 2rem 2rem 1.6rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.4rem;
-  }
-
   .cycle-label {
     display: flex; justify-content: space-between; align-items: baseline;
     font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
@@ -87,7 +104,7 @@
     font-family: "Chivo Mono", "SFMono-Regular", Consolas, monospace;
     font-variant-numeric: tabular-nums;
     font-weight: 300;
-    font-size: clamp(4rem, 18vw, 7rem);
+    font-size: clamp(2.6rem, 6.5vw, 5rem);
     line-height: 1;
     text-align: center;
     letter-spacing: -0.02em;
@@ -226,22 +243,12 @@
 </head>
 <body>
 
-<div class="app">
-  <img class="banner" src="banner.jpg"
+<div class="hero">
+  <img src="banner.jpg"
        alt="CDS Talent Sprint 2026 — BU Faculty of Computing &amp; Data Sciences. Rapid networking and personalized speed interviews, September 24.">
-  <header>
-    <h1>Twelve-Minute Bell</h1>
-    <span class="sync-chip" id="syncChip"><span class="dot"></span><span id="syncText">Connecting…</span></span>
-  </header>
-
-  <div class="config-banner" id="configBanner" hidden>
-    This copy of the site has no Firebase config yet, so devices can't sync —
-    it runs as a single-device timer. (Site owner: paste the <code>firebaseConfig</code> block into index.html.)
-  </div>
-
-  <div class="clock-card">
+  <div class="timer-card">
     <div class="cycle-label">
-      <span>Cycle countdown</span>
+      <span class="sync-chip" id="syncChip"><span class="dot"></span><span id="syncText">Connecting…</span></span>
       <strong id="cycleCount">cycle — of —</strong>
     </div>
     <div class="big-time" id="bigTime">12:00</div>
@@ -266,6 +273,18 @@
       <span>Elapsed <b id="totalElapsed">0:00:00</b></span>
       <span>Remaining <b id="totalRemaining">–:––:––</b></span>
     </div>
+  </div>
+</div>
+
+<div class="app">
+  <header>
+    <h1>Twelve-Minute Bell</h1>
+    <span class="sub">bells at 0:00 · 8:00 · 10:00 · 11:00, every cycle</span>
+  </header>
+
+  <div class="config-banner" id="configBanner" hidden>
+    This copy of the site has no Firebase config yet, so devices can't sync —
+    it runs as a single-device timer. (Site owner: paste the <code>firebaseConfig</code> block into index.html.)
   </div>
 
   <div class="sound-banner" id="soundBanner">
