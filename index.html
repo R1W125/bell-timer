@@ -75,10 +75,17 @@
     backdrop-filter: blur(12px);
     border: 1px solid var(--line);
     border-radius: 14px;
-    padding: 2.2rem 1.6rem 2rem;
-    display: flex; flex-direction: column; gap: 1.5rem;
+    padding: 2.4rem 1.7rem 2.2rem;
+    display: flex; flex-direction: column; gap: 1.7rem;
   }
   /* On small screens the image becomes a banner with the timer below it */
+  /* Mid-size screens: slightly smaller digits and a lower card so the
+     image's title stays clear */
+  @media (min-width: 701px) and (max-width: 1550px) {
+    .timer-card { bottom: 0.5rem; }
+    .big-time { font-size: clamp(3.4rem, 8.3vw, 10rem); }
+  }
+
   @media (max-width: 700px) {
     .hero { height: auto; }
     .hero img { height: auto; }
@@ -117,7 +124,7 @@
     font-family: "Chivo Mono", "SFMono-Regular", Consolas, monospace;
     font-variant-numeric: tabular-nums;
     font-weight: 300;
-    font-size: clamp(3.4rem, 9vw, 6.5rem);
+    font-size: clamp(3.4rem, 10vw, 10rem);
     line-height: 1;
     text-align: center;
     letter-spacing: -0.02em;
@@ -128,7 +135,7 @@
 
   .status-line {
     text-align: center; min-height: 1.4em;
-    font-size: 1.05rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    font-size: 1.3rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--muted);
   }
   .status-line.phase-warn  { color: var(--warn); }
@@ -137,7 +144,7 @@
 
   .track-wrap { display: flex; flex-direction: column; gap: 0.55rem; }
   .track {
-    position: relative; height: 10px; border-radius: 5px;
+    position: relative; height: 12px; border-radius: 6px;
     background: var(--track);
     overflow: visible;
   }
@@ -162,11 +169,11 @@
   .totals {
     display: flex; justify-content: space-between; gap: 1rem;
     border-top: 1px solid var(--line); padding-top: 1rem;
-    font-size: 0.92rem; color: var(--muted);
+    font-size: 1rem; color: var(--muted);
   }
   .totals b {
     color: var(--ink); font-weight: 600;
-    font-family: "Chivo Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1.05rem;
+    font-family: "Chivo Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1.2rem;
   }
 
   .sound-banner {
